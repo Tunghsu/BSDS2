@@ -5,9 +5,19 @@
  */
 package org.dongxu.CAClient;
 
-import java.rmi.registry.LocateRegistry;
-import java.rmi.registry.Registry;
+import java.util.LinkedList;
+import java.util.Queue;
 import org.dongxu.utils.log;
+import javax.ws.rs.client.ClientBuilder;
+import javax.ws.rs.client.Entity;
+import javax.ws.rs.client.Client;
+import javax.ws.rs.client.Invocation;
+import javax.ws.rs.client.WebTarget;
+import javax.ws.rs.core.MediaType;
+import javax.ws.rs.core.Response;
+import org.glassfish.jersey.client.ClientConfig;
+import org.json.JSONTokener;
+import org.json.JSONObject;
 
 /**
  *
@@ -16,19 +26,47 @@ import org.dongxu.utils.log;
  */
 public class CASubClient {
 
+    private static log out = new log("Sub");
+
     private CASubClient() {}
+
+    private static String getLatestContent(Integer subscriberId){
+        Client client = ClientBuilder.newClient();
+        String dst_sub = config.REST_BASE_URL+"/getlatestcontent/"+subscriberId.toString();
+        Response sub_res = client.target(dst_sub)
+                .request()
+                .accept(MediaType.APPLICATION_JSON)
+                .get(Response.class);
+
+        String jsonMessage = sub_res.readEntity(String.class);
+        out.println("Data received:" + jsonMessage);
+        JSONTokener jsonMessageTokener = new JSONTokener(jsonMessage);
+        JSONObject jsonMessageObject;
+        jsonMessageObject = (JSONObject) jsonMessageTokener.nextValue();
+        String message = jsonMessageObject.getString("message");
+
+        return message;
+    }
 
     public static void main(String[] args) {
         Integer count=0, sleepInterval=0, i=0;
-        log out = new log("Sub");
         String host = (args.length < 1) ? null : args[0];
         try {
-            out.println ("Publisher Client Starter");
-            Registry registry = LocateRegistry.getRegistry(host);
+            out.println ("Subscriber Client Starter");
+            Client client = ClientBuilder.newClient();
+            //Registry registry = LocateRegistry.getRegistry(host);
             out.println ("Connected to registry");
-            BSDSSubscribeInterface CAServerStub = (BSDSSubscribeInterface) registry.lookup("CAServerSubscriber");
+            //BSDSSubscribeInterface CAServerStub = (BSDSSubscribeInterface) registry.lookup("CAServerSubscriber");
             out.println ("Stub initialized");
-            int id = CAServerStub.registerSubscriber(args[1]);
+            String dst = config.REST_BASE_URL+"/regsubscriber/"+args[1];
+            Response res = client.target(dst).request().accept(MediaType.APPLICATION_JSON).get(Response.class);
+            //int id = CAServerStub.registerSubscriber(args[1]);
+            String jsonText = res.readEntity(String.class);
+            out.println("Data received:" + jsonText);
+            JSONTokener jsonTokener = new JSONTokener(jsonText);
+            JSONObject studentJSONObject;
+            studentJSONObject = (JSONObject) jsonTokener.nextValue();
+            Integer id = studentJSONObject.getInt("id");
             out.name = "Sub"+Integer.toString(id);
             out.println("Sub id = " + Integer.toString(id));
 
@@ -39,7 +77,10 @@ public class CASubClient {
             while (sleepInterval < 6401) {
                 i++;
                 long currentTimeStamp = System.currentTimeMillis();
-                String message = CAServerStub.getLatestContent(id);
+
+                String message = getLatestContent(id);
+
+                //String message = CAServerStub.getLatestContent(id);
                 if (!message.equals("")) {
                     timeInterval += System.currentTimeMillis() - currentTimeStamp;
                     //out.println("Query #"+i.toString()+": message is " + message);

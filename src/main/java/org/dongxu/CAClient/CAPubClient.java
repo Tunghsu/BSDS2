@@ -9,8 +9,6 @@ package org.dongxu.CAClient;
  *
  * @author Ian Gortan
  */
-import java.rmi.registry.LocateRegistry;
-import java.rmi.registry.Registry;
 import java.util.LinkedList;
 import java.util.Queue;
 import org.dongxu.utils.log;
@@ -21,21 +19,37 @@ import javax.ws.rs.client.Invocation;
 import javax.ws.rs.client.WebTarget;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
+import javax.ws.rs.core.Form;
 import org.glassfish.jersey.client.ClientConfig;
-import org.glassfish.jersey.jackson.JacksonFeature;
+import org.json.JSONTokener;
+import org.json.JSONObject;
 
-// Simple client to test publishing to CAServer over RMI
+// Simple client to test publishing to CAServer over JAX-RS
 
 class PubThread extends Thread {
-    log out = new log("Pub_t");
+
+    private static void publishContent(Integer publisherId, String title, String message){
+        Client client = ClientBuilder.newClient();
+        String dst_pub = config.REST_BASE_URL+"/publishcontent/";
+        Form form = new Form();
+        form.param("id", publisherId.toString());
+        form.param("message", "Message xxx yyy "+ message);
+        form.param("title", "title: "+ title);
+
+        Response pub_res = client.target(dst_pub)
+                .request()
+                .accept(MediaType.APPLICATION_JSON)
+                .post(Entity.entity(form, MediaType.APPLICATION_FORM_URLENCODED),
+                        Response.class);
+    }
+    private static log out = new log("Pub_t");
     private String[] args;
     PubThread(String[] arguments){
         args = arguments;
     }
     public void run(){
         try {
-            Client client = ClientBuilder.newClient(/*new ClientConfig()
-                    .register(JacksonFeature.class)*/);
+            Client client = ClientBuilder.newClient();
             out.println("Publisher Client Starter");
             //Registry registry = LocateRegistry.getRegistry(args[0], 1099);
             out.println("Connected to registry");
@@ -49,18 +63,24 @@ class PubThread extends Thread {
             Response res = invocationBuilder.get();*/
             Response res = client.target(dst).request().accept(MediaType.APPLICATION_JSON).get(Response.class);
             //int id = CAServerStub.registerPublisher(args[2], args[3]);
-            out.println("Pub id = " + res.readEntity(String.class).toString());
-            //out.name = "Pub"+Integer.toString(id);
+            String jsonText = res.readEntity(String.class);
+            out.println("Data received:" + jsonText);
+            JSONTokener jsonTokener = new JSONTokener(jsonText);
+            JSONObject studentJSONObject;
+            studentJSONObject = (JSONObject) jsonTokener.nextValue();
+            Integer id = studentJSONObject.getInt("id");
+            out.name = "Pub"+Integer.toString(id);
 
-/*            Integer TimesToSend = Integer.parseInt(args[4]);
+            Integer TimesToSend = Integer.parseInt(args[4]);
             Long currentTimeStamp = System.currentTimeMillis();
             for (Integer i = 0; i < TimesToSend; i++) {
-                CAServerStub.publishContent(id, "#" + i.toString(), "Message#" + i.toString(), 30000);
-                //out.println("#" + i.toString() + " message sent");
+                publishContent(id, i.toString(), "Message"+i.toString());
+                //CAServerStub.publishContent(id, "#" + i.toString(), "Message#" + i.toString(), 30000);
+                out.println("#" + i.toString() + " message sent");
             }
             Long timeInterval = System.currentTimeMillis() - currentTimeStamp;
             out.println("Totally sent messages for " + args[3] + ": " + TimesToSend.toString());
-            out.println("Totally cost " + timeInterval.toString() + " ms");*/
+            out.println("Totally cost " + timeInterval.toString() + " ms");
         } catch (Exception e) {
             System.err.println("Client exception: " + e.toString());
             e.printStackTrace();

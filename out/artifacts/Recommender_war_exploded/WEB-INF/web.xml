@@ -26,7 +26,7 @@
 
     <!-- web services -->
 
-    <display-name>Dendro Recommender Web Service</display-name>
+    <display-name>BSDSAssignment2-WS</display-name>
     <servlet>
         <description>JAX-RS Tools Generated - Do not modify</description>
         <servlet-name>JAX-RS Servlet</servlet-name>

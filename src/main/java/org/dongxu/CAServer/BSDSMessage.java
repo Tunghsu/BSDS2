@@ -4,16 +4,19 @@
 package org.dongxu.CAServer;
 
 //contains data for message delivery to subscribers
+//contains data for message delivery to subscribers
 
 public class BSDSMessage {
     private String title;
     private String message;
     private String source;
+    private Integer publisherId;
 
-    BSDSMessage(String title, String message, String source){
+    BSDSMessage(String title, String message, String source, Integer id){
         this.title = title;
         this.message = message;
         this.source = source;
+        this.setPublisherId(id);
     }
 
     public String getTitle() {
@@ -38,6 +41,14 @@ public class BSDSMessage {
 
     public void setSource(String source) {
         this.source = source;
+    }
+
+    public Integer getPublisherId() {
+        return publisherId;
+    }
+
+    public void setPublisherId(Integer publisherId) {
+        this.publisherId = publisherId;
     }
 }
 

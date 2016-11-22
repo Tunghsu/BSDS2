@@ -3,20 +3,45 @@
  */
 package org.dongxu.CAServer;
 
-import java.rmi.registry.Registry;
-import java.rmi.registry.LocateRegistry;
-import java.rmi.RemoteException;
-import java.rmi.server.UnicastRemoteObject;
+import java.util.ArrayList;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.PriorityBlockingQueue;
 import java.util.Comparator;
 import org.dongxu.utils.log;
+import java.util.StringTokenizer;
+import java.util.HashSet;
+import org.sqlite.JDBC;
+
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.sql.Statement;
 
 //Skeleton of CAServer supporting both BSDS interfaces
 
 public class CAServer implements BSDSPublishInterface, BSDSSubscribeInterface{
 
+    private static Connection connection;
+    private static Statement statement;
+    private static HashSet<String> set = new HashSet<>();
     private log out = new log("Serv");
+
+    public CAServer(){
+        try {
+            Class.forName("org.sqlite.JDBC");
+            //connection = DriverManager.getConnection("jdbc:sqlite:db/db.sqlite");
+            connection = DriverManager.getConnection("jdbc:sqlite:/home/dongxu/Workspace/IntelliJ13.0-JerseyWS-master/db/db.sqlite");
+            statement = connection.createStatement();
+        } catch (Exception e){
+            out.println(e.toString());
+        }
+        set.add("a");
+        set.add("the");
+        set.add("is");
+        set.add("are");
+        set.add("of");
+    }
 
     public class TimeElement{
         public long TimeStamp;
@@ -124,7 +149,7 @@ public class CAServer implements BSDSPublishInterface, BSDSSubscribeInterface{
              TopicMessageId = TopicIdGenerator.get(topic)+1;
              TopicIdGenerator.replace(topic, TopicMessageId);
          }
-         BSDSMessage bsdsMessage= new BSDSMessage(title, message, name);
+         BSDSMessage bsdsMessage= new BSDSMessage(title, message, name, 0);
          Messages.put(GlobalMessageId, bsdsMessage);
 
          ConcurrentHashMap<Integer, Integer> converter, messageCount;
@@ -230,5 +255,64 @@ public class CAServer implements BSDSPublishInterface, BSDSSubscribeInterface{
             }
         }
         return message;
+    }
+
+    public void countWords(String message){
+        StringTokenizer st = new StringTokenizer(message, " ");
+        ConcurrentHashMap<String, Integer> wordsMap = new ConcurrentHashMap<>();
+        while(st.hasMoreTokens()) {
+            String word = st.nextToken();
+            System.out.println(word);
+            if (set.contains(word)){
+                continue;
+            }
+            if (wordsMap.containsKey(word)){
+                wordsMap.replace(word, wordsMap.get(word)+1);
+            } else {
+                wordsMap.put(word, 1);
+            }
+        }
+
+        /* update sqlite db */
+        try {
+            for (ConcurrentHashMap.Entry<String, Integer> cursor : wordsMap.entrySet()){
+                String select = "SELECT * FROM words_count WHERE word=\'"
+                        + cursor.getKey() + "\'";
+                ResultSet rs = statement.executeQuery(select);
+                if (rs.next()){
+                    Integer oldWordCount = rs.getInt("word_count");
+                    Integer oldDerivedCount = rs.getInt("derived_message_count");
+                    String sql = "UPDATE words_count SET word_count=\'"+
+                            ((Integer)(oldWordCount+cursor.getValue())).toString()+
+                            "\', derived_message_count=\'" + ((Integer)(oldDerivedCount+1)).toString()
+                            + "\' WHERE word=\'" + cursor.getKey() + "\'";
+                    statement.executeUpdate(sql);
+                } else {
+                    String sql = "INSERT INTO words_count (word, word_count, derived_message_count)" +
+                            " VALUES(\'" + cursor.getKey() + "\', " + cursor.getValue().toString() +
+                            ", 1)";
+                    statement.executeUpdate(sql);
+                }
+            }
+        } catch (Exception e){
+            System.out.println(e.toString());
+        }
+
+
+    }
+
+    public String getTopN(Integer n){
+        String query = "SELECT * FROM words_count ORDER BY word_count DESC LIMIT " + n.toString();
+        String topNResult = "";
+        try {
+            ResultSet rs = statement.executeQuery(query);
+            while (rs.next()){
+                topNResult += rs.getString("word") + ": " +
+                        ((Integer)rs.getInt("word_count")).toString() + "< br />";
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return topNResult;
     }
 }

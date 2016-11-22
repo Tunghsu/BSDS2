@@ -128,7 +128,7 @@ public class Server {
     public Response publishContent_rest(@FormParam("id") String publisherId,
                                         @FormParam("title") String title,
                                         @FormParam("message") String message){
-        caServer.publishContent(Integer.parseInt(publisherId), title, message, 30000);
+        caServer.publishContent(Integer.parseInt(publisherId), title, message, 300000);
         caServer.countWords(message);
         out.println("content published");
         return Response.ok().build();

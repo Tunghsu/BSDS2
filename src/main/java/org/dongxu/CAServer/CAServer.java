@@ -278,20 +278,22 @@ public class CAServer implements BSDSPublishInterface, BSDSSubscribeInterface{
             for (ConcurrentHashMap.Entry<String, Integer> cursor : wordsMap.entrySet()){
                 String select = "SELECT * FROM words_count WHERE word=\'"
                         + cursor.getKey() + "\'";
-                ResultSet rs = statement.executeQuery(select);
-                if (rs.next()){
-                    Integer oldWordCount = rs.getInt("word_count");
-                    Integer oldDerivedCount = rs.getInt("derived_message_count");
-                    String sql = "UPDATE words_count SET word_count=\'"+
-                            ((Integer)(oldWordCount+cursor.getValue())).toString()+
-                            "\', derived_message_count=\'" + ((Integer)(oldDerivedCount+1)).toString()
-                            + "\' WHERE word=\'" + cursor.getKey() + "\'";
-                    statement.executeUpdate(sql);
-                } else {
-                    String sql = "INSERT INTO words_count (word, word_count, derived_message_count)" +
-                            " VALUES(\'" + cursor.getKey() + "\', " + cursor.getValue().toString() +
-                            ", 1)";
-                    statement.executeUpdate(sql);
+                synchronized(this){
+                    ResultSet rs = statement.executeQuery(select);
+                    if (rs.next()) {
+                        Integer oldWordCount = rs.getInt("word_count");
+                        Integer oldDerivedCount = rs.getInt("derived_message_count");
+                        String sql = "UPDATE words_count SET word_count=\'" +
+                                ((Integer) (oldWordCount + cursor.getValue())).toString() +
+                                "\', derived_message_count=\'" + ((Integer) (oldDerivedCount + 1)).toString()
+                                + "\' WHERE word=\'" + cursor.getKey() + "\'";
+                        statement.executeUpdate(sql);
+                    } else {
+                        String sql = "INSERT INTO words_count (word, word_count, derived_message_count)" +
+                                " VALUES(\'" + cursor.getKey() + "\', " + cursor.getValue().toString() +
+                                ", 1)";
+                        statement.executeUpdate(sql);
+                    }
                 }
             }
         } catch (Exception e){

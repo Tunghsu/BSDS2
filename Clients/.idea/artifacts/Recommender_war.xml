@@ -1,0 +1,11 @@
+<component name="ArtifactManager">
+  <artifact type="war" name="Recommender:war">
+    <output-path>$PROJECT_DIR$/out/artifacts/Recommender_war</output-path>
+    <root id="archive" name="Recommender_war.war">
+      <element id="artifact" artifact-name="Recommender:war exploded" />
+      <element id="directory" name="WEB-INF">
+        <element id="directory" name="classes" />
+      </element>
+    </root>
+  </artifact>
+</component>

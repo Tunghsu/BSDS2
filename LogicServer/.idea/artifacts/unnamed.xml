@@ -1,0 +1,10 @@
+<component name="ArtifactManager">
+  <artifact type="exploded-ejb" name="unnamed">
+    <output-path>$PROJECT_DIR$/out/artifacts/unnamed</output-path>
+    <root id="root">
+      <element id="module-output" name="Server_2" />
+      <element id="library" level="project" name="remoteInterface" />
+      <element id="library" level="project" name="sqlite-jdbc-3.15.1" />
+    </root>
+  </artifact>
+</component>

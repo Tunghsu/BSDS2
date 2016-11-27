@@ -1,0 +1,18 @@
+<component name="libraryTable">
+  <library name="sqlite-jdbc-3.15.1">
+    <CLASSES>
+      <root url="jar://$PROJECT_DIR$/../IntelliJ13.0-JerseyWS-master/lib/sqlite-jdbc-3.15.1.jar!/" />
+      <root url="jar://$PROJECT_DIR$/../IntelliJ13.0-JerseyWS-master/lib/javax.inject-2.2.0-b21.jar!/" />
+      <root url="jar://$PROJECT_DIR$/../IntelliJ13.0-JerseyWS-master/lib/jsonp-jaxrs-1.0.jar!/" />
+      <root url="jar://$PROJECT_DIR$/../IntelliJ13.0-JerseyWS-master/lib/javax.json-api-1.0.jar!/" />
+      <root url="jar://$PROJECT_DIR$/../IntelliJ13.0-JerseyWS-master/lib/json-20140107.jar!/" />
+      <root url="jar://$PROJECT_DIR$/../IntelliJ13.0-JerseyWS-master/lib/javax.json-1.0.2.jar!/" />
+      <root url="jar://$PROJECT_DIR$/../IntelliJ13.0-JerseyWS-master/lib/osgi-resource-locator-1.0.1.jar!/" />
+      <root url="jar://$PROJECT_DIR$/../IntelliJ13.0-JerseyWS-master/lib/javax.ejb-api.jar!/" />
+      <root url="jar://$PROJECT_DIR$/../IntelliJ13.0-JerseyWS-master/lib/javax.annotation-api-1.2.jar!/" />
+      <root url="jar://$PROJECT_DIR$/../IntelliJ13.0-JerseyWS-master/lib/cglib-2.2.0-b21.jar!/" />
+    </CLASSES>
+    <JAVADOC />
+    <SOURCES />
+  </library>
+</component>

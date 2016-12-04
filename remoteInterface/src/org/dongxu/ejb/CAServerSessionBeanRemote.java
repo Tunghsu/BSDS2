@@ -23,8 +23,10 @@ public interface CAServerSessionBeanRemote {
 
     String getTopN(Integer n);
 
-    void publishContent(Integer publisherID, String title, String message, Integer TimeToLive);
+    //void publishContent(Integer publisherID, String title, String message, Integer TimeToLive);
 
     void addToContentBuffer(org.dongxu.ejb.BSDSMessage message);
+
+    void pushMessage(String title, String body, Integer id);
     
 }

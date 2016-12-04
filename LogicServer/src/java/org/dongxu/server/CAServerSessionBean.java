@@ -6,7 +6,6 @@
 package org.dongxu.server;
 
 import javax.ejb.Stateless;
-import javax.ejb.LocalBean;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.PriorityBlockingQueue;
@@ -14,48 +13,46 @@ import java.util.Comparator;
 
 import org.dongxu.ejb.BSDSMessage;
 import org.dongxu.ejb.CAServerSessionBeanRemote;
+import org.dongxu.ejb_db.TopNRemote;
 import org.dongxu.utils.log;
-import java.util.StringTokenizer;
 import java.util.HashSet;
 
 import java.sql.Connection;
-import java.sql.DriverManager;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.util.logging.Level;
+import java.util.logging.Logger;
+import javax.ejb.EJB;
+import javax.naming.Context;
+import javax.naming.InitialContext;
+import javax.naming.NamingException;
 
 /**
  *
  * @author dongxu
  */
 @Stateless
-@LocalBean
 public class CAServerSessionBean implements CAServerSessionBeanRemote {
 
-    private static Connection connection;
-    private static Statement statement;
+
+    @EJB
+    private TopNRemote topN = lookupTopNRemote();
+
+
     private static HashSet<String> set = new HashSet<>();
+    public static ConcurrentLinkedQueue<String> messageBuffer = new ConcurrentLinkedQueue<String>();
     private log out = new log("Serv");
 
     public CAServerSessionBean(){
         this.contentBuffer = new ConcurrentLinkedQueue<>();
-        try {
-            Class.forName("org.sqlite.JDBC");
-            //connection = DriverManager.getConnection("jdbc:sqlite:db/db.sqlite");
-            connection = DriverManager.getConnection("jdbc:sqlite:/home/dongxu/Workspace/IntelliJ13.0-JerseyWS-master/db/db.sqlite");
-            statement = connection.createStatement();
-        } catch (Exception e){
-            out.println(e.toString());
-        }
-        set.add("a");
-        set.add("the");
-        set.add("is");
-        set.add("are");
-        set.add("of");
-        Thread t = new AsyncPublisherConsumer(this);
-        Thread t1 = new AsyncCountConsumer(this);
-        t.start();
-        t1.start();
+        Thread publishThread = new AsyncPublisherConsumer(this);
+        publishThread.start();
+        
+        Thread countThread = new AsyncCountHandler(messageBuffer);
+        countThread.start();
+        
+        System.out.print("Server Bean started");
     }
 
     public class TimeElement{
@@ -76,24 +73,24 @@ public class CAServerSessionBean implements CAServerSessionBeanRemote {
         }
     }
 
-    public ConcurrentLinkedQueue<BSDSMessage> contentBuffer;
-    public ConcurrentLinkedQueue<String> countBuffer = new ConcurrentLinkedQueue<>();
-    private int CurrentMessageIdOrder=0;
+    public static ConcurrentLinkedQueue<BSDSMessage> contentBuffer;
+    //public ConcurrentLinkedQueue<String> countBuffer = new ConcurrentLinkedQueue<>();
+    private static int CurrentMessageIdOrder=0;
     private static int CurrentUserIdOrder=0;
     private static ConcurrentHashMap<String, ConcurrentHashMap<Integer, Integer>> MessageDeliveredCount = new ConcurrentHashMap<>();
     public static ConcurrentHashMap<String, ConcurrentHashMap<Integer, Integer>> TopicToGlobalConverter = new ConcurrentHashMap<>();
     public static ConcurrentHashMap<Integer, MessageIdentifier> GlobalToTopicConverter = new ConcurrentHashMap<>();
-    private ConcurrentHashMap<Integer, Integer> LastTopicIdBySubscriberId = new ConcurrentHashMap<>();
+    private static ConcurrentHashMap<Integer, Integer> LastTopicIdBySubscriberId = new ConcurrentHashMap<>();
     // Used by publishers
-    private ConcurrentHashMap<Integer, String[]> TopicByPublisherId = new ConcurrentHashMap<>();
-    private ConcurrentHashMap<String, Integer> TopicIdGenerator = new ConcurrentHashMap<>();
+    private static ConcurrentHashMap<Integer, String[]> TopicByPublisherId = new ConcurrentHashMap<>();
+    private static ConcurrentHashMap<String, Integer> TopicIdGenerator = new ConcurrentHashMap<>();
     public static ConcurrentHashMap<Integer, BSDSMessage> Messages = new ConcurrentHashMap<Integer, BSDSMessage>();
     public static ConcurrentHashMap<String, Integer> CurrentProgressByTopic = new ConcurrentHashMap<>();
     public static ConcurrentHashMap<String, Integer> LowestIdByTopic = new ConcurrentHashMap<>();
 
     // Used by subscribers
     private static ConcurrentHashMap<String, Integer> TopicSubscriberCount = new ConcurrentHashMap<>();
-    private ConcurrentHashMap<Integer, String> SubscribedTopicBySubscriberId = new ConcurrentHashMap<>();
+    private static ConcurrentHashMap<Integer, String> SubscribedTopicBySubscriberId = new ConcurrentHashMap<>();
 
     public static class PQsort implements Comparator<TimeElement> {
 
@@ -146,11 +143,11 @@ public class CAServerSessionBean implements CAServerSessionBeanRemote {
         if (!TopicIdGenerator.containsKey(topic)){
             TopicIdGenerator.put(topic, 0);
         }
-        out.println(
-                        "Publisher: " +
-                        name + "\t" +
-                        topic
-        );
+//        out.println(
+//                        "Publisher: " +
+//                        name + "\t" +
+//                        topic
+//        );
         return id;
     }
 
@@ -172,7 +169,7 @@ public class CAServerSessionBean implements CAServerSessionBeanRemote {
          if (StartId == null)
              StartId = 0;
          LastTopicIdBySubscriberId.put(id, (Integer)StartId);
-         out.println("Topic is  " + topic);
+         //out.println("Topic is  " + topic);
 
          if (TopicSubscriberCount.containsKey(topic)){
              TopicSubscriberCount.replace(topic, TopicSubscriberCount.get(topic)+1);
@@ -232,23 +229,14 @@ public class CAServerSessionBean implements CAServerSessionBeanRemote {
 
     @Override
     public String getTopN(Integer n) {
-        String query = "SELECT * FROM words_count ORDER BY word_count DESC LIMIT " + n.toString();
-        String topNResult = "";
-        try {
-            ResultSet rs = statement.executeQuery(query);
-            while (rs.next()){
-                topNResult += rs.getString("word") + ": " +
-                        ((Integer)rs.getInt("word_count")).toString() + "< br />";
-            }
-        } catch (SQLException e) {
-            e.printStackTrace();
-        }
-        return topNResult;
+        return topN.getTopN(n);
     }
 
-    @Override
+    //@Override
     public void publishContent(Integer publisherID, String title, String message, Integer TimeToLive) {
-           String[] value = TopicByPublisherId.get(publisherID);
+         String[] value = TopicByPublisherId.get(publisherID);
+         while (value == null)
+             value = TopicByPublisherId.get(publisherID);
          String topic = value[1], name = value[0];
          //ContentByTopic.put(topic, value);
 
@@ -284,101 +272,46 @@ public class CAServerSessionBean implements CAServerSessionBeanRemote {
          messageCount.put(TopicMessageId, 0);
          MessageDeliveredCount.replace(topic, messageCount);
 
-         long currentTimeStamp = System.currentTimeMillis();
+         //long currentTimeStamp = System.currentTimeMillis();
 
-         TimeElement te = new TimeElement(currentTimeStamp+TimeToLive+100, GlobalMessageId);
-         TimeOutQueue.add(te);
+         //TimeElement te = new TimeElement(currentTimeStamp+TimeToLive+100, GlobalMessageId);
+         //TimeOutQueue.add(te);
 
          if (CurrentProgressByTopic.containsKey(topic)){
              CurrentProgressByTopic.replace(topic, TopicMessageId);
          } else {
              CurrentProgressByTopic.put(topic, TopicMessageId);
          }
+         
+         //System.out.print("Got "+ topic);
     }
     
-        public void countWords(String message){
-        StringTokenizer st = new StringTokenizer(message, " ");
-        ConcurrentHashMap<String, Integer> wordsMap = new ConcurrentHashMap<>();
-        while(st.hasMoreTokens()) {
-            String word = st.nextToken();
-            System.out.println(word);
-            if (set.contains(word)){
-                continue;
-            }
-            if (wordsMap.containsKey(word)){
-                wordsMap.replace(word, wordsMap.get(word)+1);
-            } else {
-                wordsMap.put(word, 1);
-            }
-        }
-
-        /* update sqlite db */
-        try {
-            for (ConcurrentHashMap.Entry<String, Integer> cursor : wordsMap.entrySet()){
-                String select = "SELECT * FROM words_count WHERE word=\'"
-                        + cursor.getKey() + "\'";
-                synchronized(this){
-                    ResultSet rs = statement.executeQuery(select);
-                    if (rs.next()) {
-                        Integer oldWordCount = rs.getInt("word_count");
-                        Integer oldDerivedCount = rs.getInt("derived_message_count");
-                        String sql = "UPDATE words_count SET word_count=\'" +
-                                ((Integer) (oldWordCount + cursor.getValue())).toString() +
-                                "\', derived_message_count=\'" + ((Integer) (oldDerivedCount + 1)).toString()
-                                + "\' WHERE word=\'" + cursor.getKey() + "\'";
-                        statement.executeUpdate(sql);
-                    } else {
-                        String sql = "INSERT INTO words_count (word, word_count, derived_message_count)" +
-                                " VALUES(\'" + cursor.getKey() + "\', " + cursor.getValue().toString() +
-                                ", 1)";
-                        statement.executeUpdate(sql);
-                    }
-                }
-            }
-        } catch (Exception e){
-            System.out.println(e.toString());
-        }
-    }
-
     @Override
     public void addToContentBuffer(BSDSMessage message) {
+        //System.out.print("Reached add to buffer");
         this.contentBuffer.add(message);
+    }   
+
+    @Override
+    public void pushMessage(String title, String body, Integer id) {
+        //System.out.print("Reached add to buffer");
+        BSDSMessage m = new BSDSMessage(title, body, "", id);
+        messageBuffer.add(body);
+        contentBuffer.add(m);
     }
-        
     
-    
-}
-
-class AsyncPublisherConsumer extends Thread {
-    CAServerSessionBean caserver;
-    public AsyncPublisherConsumer(CAServerSessionBean server){
-        caserver = server;
-    }
-    public void run(){
-        while (true){
-            while (caserver.contentBuffer.isEmpty())
-                continue;
-            BSDSMessage message = caserver.contentBuffer.poll();
-            caserver.publishContent(message.getPublisherId(), message.getTitle(),
-                    message.getMessage(), 300000);
-            caserver.countBuffer.add(message.getMessage());
-        }
-
-
-    }
-}
-
-class AsyncCountConsumer extends Thread {
-    CAServerSessionBean caserver;
-    public AsyncCountConsumer(CAServerSessionBean server){
-        caserver = server;
-    }
-    public void run(){
-        while (true){
-            while (caserver.countBuffer.isEmpty())
-                continue;
-            String message = caserver.countBuffer.poll();
-            caserver.countWords(message);
+    private TopNRemote lookupTopNRemote() {
+        try {
+            System.setProperty("org.omg.CORBA.ORBInitialHost", "127.0.0.1");
+            System.setProperty("org.omg.CORBA.ORBInitialPort", "8080");
+            Context c = new InitialContext();
+            return (TopNRemote) c.lookup("java:global/WordCount/TopN!org.dongxu.ejb_db.TopNRemote");
+            //return (CAServerSessionBeanRemote) c.lookup("java:comp/env/Server_2/CAServerSessionBean!org.dongxu.ejb.CAServerSessionBeanRemote");
+        } catch (NamingException ne) {
+            Logger.getLogger(getClass().getName()).log(Level.SEVERE, "exception caught", ne);
+            throw new RuntimeException(ne);
         }
     }
+    
+    
 }

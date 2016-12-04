@@ -5,6 +5,7 @@
  */
 package org.dongxu.ws;
 
+import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import javax.ejb.Stateless;
@@ -23,6 +24,7 @@ import javax.ws.rs.PathParam;
 import javax.ws.rs.FormParam;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
+import org.dongxu.ejb.BSDSMessage;
 import org.json.JSONStringer;
 
 
@@ -58,7 +60,7 @@ public class WebService {
 
         JSONStringer json = new JSONStringer();
         json.object().key("id").value(res).endObject();
-        System.out.println(json.toString());
+        //System.out.println(json.toString());
 
         return Response.ok(json.toString()).build();
     }
@@ -73,7 +75,7 @@ public class WebService {
 
         JSONStringer json = new JSONStringer();
         json.object().key("id").value(res).endObject();
-        System.out.println(json.toString());
+        //System.out.println(json.toString());
 
         return Response.ok(json.toString()).build();
     }
@@ -88,7 +90,7 @@ public class WebService {
 
         JSONStringer json = new JSONStringer();
         json.object().key("message").value(res).endObject();
-        System.out.println(json.toString());
+        //System.out.println(json.toString());
 
         return Response.ok(json.toString()).build();
     }
@@ -115,10 +117,10 @@ public class WebService {
     public Response publishContent_rest(@FormParam("id") String publisherId,
                                         @FormParam("title") String title,
                                         @FormParam("message") String message){
-        cAServerSessionBean.addToContentBuffer(new org.dongxu.ejb.BSDSMessage(title, message, "", Integer.parseInt(publisherId)));
-        out.println("content buffered for publishing");
+        
+        cAServerSessionBean.pushMessage(title, message, Integer.parseInt(publisherId));
+        //out.println("content buffered for publishing");
         return Response.ok().build();
-
     }
     
     @GET
@@ -126,12 +128,17 @@ public class WebService {
         return "<html> " + "<title>" + "Hello Jersey" + "</title>"
                 + "<body><h1>" + "Hello Jersey " + "</body></h1>" + "</html> ";
     }
+    
+    
 
 
     private CAServerSessionBeanRemote lookupCAServerSessionBeanRemote() {
         try {
+            System.setProperty("org.omg.CORBA.ORBInitialHost", "127.0.0.1");
+            System.setProperty("org.omg.CORBA.ORBInitialPort", "8080");
             Context c = new InitialContext();
             return (CAServerSessionBeanRemote) c.lookup("java:global/Server_2/CAServerSessionBean!org.dongxu.ejb.CAServerSessionBeanRemote");
+            //return (CAServerSessionBeanRemote) c.lookup("java:comp/env/Server_2/CAServerSessionBean!org.dongxu.ejb.CAServerSessionBeanRemote");
         } catch (NamingException ne) {
             Logger.getLogger(getClass().getName()).log(Level.SEVERE, "exception caught", ne);
             throw new RuntimeException(ne);
